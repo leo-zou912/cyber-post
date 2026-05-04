@@ -7,27 +7,19 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --neon-blue: #00f3ff; --dark-bg: #0d0d0f; --glass: rgba(255, 255, 255, 0.05); }
-        body { background: var(--dark-bg); color: #e0e0e0; font-family: -apple-system, sans-serif; margin: 0; padding: 15px; overflow-x: hidden; }
+        body { background: var(--dark-bg); color: #e0e0e0; font-family: -apple-system, sans-serif; margin: 0; padding: 15px; }
         .card { background: var(--glass); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 20px; margin-bottom: 15px; }
         h2 { color: var(--neon-blue); font-size: 1.1rem; margin-top: 0; border-left: 3px solid var(--neon-blue); padding-left: 10px; }
-        input, textarea, select { width: 100%; padding: 12px; margin: 8px 0; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: #fff; outline: none; }
+        input, textarea, select { width: 100%; padding: 12px; margin: 8px 0; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: #fff; box-sizing: border-box; }
         .tab-group { display: flex; gap: 10px; margin-bottom: 15px; }
-        .tab { flex: 1; padding: 10px; text-align: center; border-radius: 8px; font-size: 0.85rem; background: rgba(255,255,255,0.05); cursor: pointer; transition: 0.3s; }
+        .tab { flex: 1; padding: 10px; text-align: center; border-radius: 8px; background: rgba(255,255,255,0.05); cursor: pointer; }
         .tab.active { background: var(--neon-blue); color: #000; font-weight: bold; }
-        .search-bar { position: sticky; top: 0; z-index: 100; background: var(--dark-bg); padding: 10px 0; }
-        .post-item { border-bottom: 1px solid rgba(255,255,255,0.05); padding: 12px 0; animation: fadeIn 0.5s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .tag { font-size: 0.65rem; background: rgba(0, 243, 255, 0.1); color: var(--neon-blue); padding: 2px 6px; border-radius: 4px; margin-right: 5px; }
-        .price-notice { text-align: center; font-size: 1.2rem; color: var(--neon-blue); margin: 15px 0; font-family: monospace; text-shadow: 0 0 8px var(--neon-blue); }
-        .btn-main { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; background: linear-gradient(90deg, #00f3ff, #0077ff); cursor: pointer; transition: 0.3s; }
-        #modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 999; justify-content: center; align-items: center; flex-direction: column; padding: 20px; backdrop-filter: blur(10px); }
+        .btn-main { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; background: linear-gradient(90deg, #00f3ff, #0077ff); color: white; }
+        .post-item { border-bottom: 1px solid rgba(255,255,255,0.05); padding: 12px 0; }
+        #modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 999; justify-content: center; align-items: center; flex-direction: column; padding: 20px; }
     </style>
 </head>
 <body>
-
-    <div class="search-bar">
-        <input type="text" id="searchInput" placeholder="🔍 搜索公开的音乐、故事、秘密..." oninput="searchPosts()">
-    </div>
 
     <div class="card" id="square">
         <h2>公共广场</h2>
@@ -40,34 +32,33 @@
             <div class="tab active" id="tab-public" onclick="setMode('public')">免费公开</div>
             <div class="tab" id="tab-private" onclick="setMode('private')">私密封存</div>
         </div>
-        <input type="text" id="sender" placeholder="你的称呼 (或 IP 匿名)">
+        <input type="text" id="sender" placeholder="你的称呼">
         <select id="category">
             <option value="story">📖 故事/文字</option>
             <option value="music">🎵 音乐/链接</option>
             <option value="secret">🤫 秘密/心情</option>
         </select>
-        <textarea id="content" rows="4" placeholder="在这里写下你的内容..."></textarea>
+        <textarea id="content" rows="4" placeholder="写下你想说的话..."></textarea>
         <div id="privateOptions" style="display:none;">
             <input type="date" id="releaseDate">
-            <div class="price-notice" id="dynamicPrice">￥ 1.88</div>
+            <p style="text-align:center; color:var(--neon-blue);">￥ 1.88</p>
         </div>
-        <button class="btn-main" id="submitBtn" onclick="handleAction()">立即发布</button>
+        <button class="btn-main" onclick="handleAction()">立即发布</button>
     </div>
 
     <div id="modal">
         <div style="text-align:center; background: #1a1a1c; padding: 30px; border-radius: 20px; border: 1px solid var(--neon-blue);">
-            <p>扫码建立个人加密通道</p>
-            <img src="wx_pay.jpg" style="width:200px; border-radius:10px; margin: 20px 0;">
-            <button class="btn-main" onclick="finalSubmit()">我已支付，确认封存</button>
-            <p style="font-size: 0.8rem; color: #555; margin-top: 15px;" onclick="document.getElementById('modal').style.display='none'">取消</p>
+            <p>扫码完成支付以封存</p>
+            <img src="wx_pay.jpg" style="width:200px; margin: 20px 0;">
+            <button class="btn-main" onclick="finalSubmit()">我已支付</button>
+            <p style="margin-top:10px;" onclick="document.getElementById('modal').style.display='none'">取消</p>
         </div>
     </div>
 
     <script>
-        // --- 核心配置 ---
+        // --- 核心配置 (请确保 Supabase 首字母大写) ---
         const SB_URL = "https://ycurewcdwnsbncafqbaj.supabase.co";
         const SB_KEY = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg";
-        // 关键点：Supabase 首字母必须大写
         const supabase = Supabase.createClient(SB_URL, SB_KEY);
 
         let currentMode = 'public';
@@ -80,29 +71,23 @@
         }
 
         async function searchPosts() {
-            const keyword = document.getElementById('searchInput').value;
-            let query = supabase.from('capsules').select('*').eq('is_public', true);
-            if(keyword) query = query.ilike('content', `%${keyword}%`);
-            
-            const { data, error } = await query.order('created_at', { ascending: false }).limit(20);
+            const { data, error } = await supabase.from('capsules').select('*').eq('is_public', true).order('created_at', { ascending: false });
             const list = document.getElementById('postsList');
-            
-            if(data && data.length > 0) {
+            if (data && data.length > 0) {
                 list.innerHTML = data.map(p => `
                     <div class="post-item">
-                        <span class="tag">${p.category === 'music' ? '🎵' : (p.category === 'story' ? '📖' : '🤫')}</span>
                         <b style="color:var(--neon-blue)">@${p.sender}</b>
-                        <p style="font-size:0.9rem; margin:8px 0; color:#bbb;">${p.content}</p>
+                        <p>${p.content}</p>
                     </div>
                 `).join('');
             } else {
-                list.innerHTML = "<p style='font-size:0.8rem; color:#666;'>广场空空如也，等待第一份投递...</p>";
+                list.innerHTML = "广场空空如也，等待第一份投递...";
             }
         }
 
         function handleAction() {
-            if(!document.getElementById('content').value) return alert("内容不能为空");
-            if(currentMode === 'private') {
+            if (!document.getElementById('content').value) return alert("写点什么吧");
+            if (currentMode === 'private') {
                 document.getElementById('modal').style.display = 'flex';
             } else {
                 finalSubmit();
@@ -110,27 +95,21 @@
         }
 
         async function finalSubmit() {
-            const sender = document.getElementById('sender').value || "匿名信使";
-            const content = document.getElementById('content').value;
-            const category = document.getElementById('category').value;
-            const accessKey = "CP-" + Math.floor(1000 + Math.random()*9000);
-
             const { error } = await supabase.from('capsules').insert([{
-                sender, content, category, 
+                sender: document.getElementById('sender').value || "匿名",
+                content: document.getElementById('content').value,
+                category: document.getElementById('category').value,
                 is_public: (currentMode === 'public'),
-                access_key: accessKey,
                 release_time: document.getElementById('releaseDate').value || null
             }]);
-
-            if(!error) {
-                alert(currentMode==='public' ? "投递成功！" : "封存成功！凭证码：" + accessKey);
+            if (!error) {
+                alert("投递成功！");
                 location.reload();
             } else {
-                alert("连接失败: " + error.message);
+                alert("发布失败，请检查网络");
             }
         }
 
-        // 启动加载数据
         searchPosts();
     </script>
 </body>
