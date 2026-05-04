@@ -4,21 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>赛博邮报</title>
-    <script src="https://npm.elemecdn.com/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --blue: #00f3ff; --bg: #0d0d0f; }
-        body { background: var(--bg); color: #e0e0e0; font-family: sans-serif; padding: 15px; }
+        body { background: var(--bg); color: #e0e0e0; font-family: sans-serif; padding: 15px; margin: 0; }
         .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 15px; padding: 20px; margin-bottom: 15px; }
-        input, textarea, select { width: 100%; padding: 12px; margin: 8px 0; background: #000; border: 1px solid #333; border-radius: 8px; color: #fff; box-sizing: border-box; }
-        .btn { width: 100%; padding: 15px; border-radius: 10px; border: none; background: var(--blue); color: #000; font-weight: bold; }
+        input, textarea, select { width: 100%; padding: 12px; margin: 8px 0; background: #000; border: 1px solid #333; border-radius: 8px; color: #fff; box-sizing: border-box; font-size: 16px; }
+        .btn { width: 100%; padding: 15px; border-radius: 10px; border: none; background: var(--blue); color: #000; font-weight: bold; cursor: pointer; }
+        #list { min-height: 50px; font-size: 14px; }
         .post { border-bottom: 1px solid #222; padding: 10px 0; }
-        #modal { display: none; position: fixed; inset: 0; background: #000; z-index: 99; flex-direction: column; align-items: center; justify-content: center; }
+        #modal { display: none; position: fixed; inset: 0; background: #000; z-index: 99; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
     </style>
 </head>
 <body>
     <div class="card">
         <h3>公共广场</h3>
-        <div id="list">正在同步链路...</div>
+        <div id="list">正在同步链路，请稍候...</div>
     </div>
     <div class="card">
         <h3>新投递</h3>
@@ -28,42 +29,74 @@
         </select>
         <input id="u" placeholder="你的称呼">
         <textarea id="c" rows="4" placeholder="写下内容..."></textarea>
-        <div id="p_opt" style="display:none"><input type="date" id="d"></div>
+        <div id="p_opt" style="display:none"><p>设置解锁日期：</p><input type="date" id="d"></div>
         <button class="btn" onclick="send()">立即发布</button>
     </div>
+
     <div id="modal">
-        <p>支付 1.88 元开启封存</p>
-        <img src="wx_pay.jpg" style="width:200px; margin:20px">
-        <button onclick="commit()">我已支付</button>
-        <p onclick="this.parentElement.style.display='none'">返回</p>
+        <div style="padding:20px;">
+            <p>支付 1.88 元开启封存</p>
+            <img src="wx_pay.jpg" style="width:220px; border-radius:10px; margin:20px 0;">
+            <button class="btn" onclick="commit()">我已支付</button>
+            <p style="margin-top:20px; color:#888;" onclick="document.getElementById('modal').style.display='none'">返回修改</p>
+        </div>
     </div>
+
     <script>
         var api, SB_U = "https://ycurewcdwnsbncafqbaj.supabase.co", SB_K = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg";
+        
         function init() {
-            if (window.Supabase) {
-                api = Supabase.createClient(SB_U, SB_K);
+            // 检查 Supabase 是否加载
+            if (window.supabase) {
+                api = window.supabase.createClient(SB_U, SB_K);
+                console.log("SDK Load Success");
                 load();
-            } else { setTimeout(init, 500); }
+            } else {
+                console.log("SDK Retry...");
+                setTimeout(init, 800);
+            }
         }
+
         async function load() {
-            const { data } = await api.from('capsules').select('*').eq('is_public', true).order('created_at', { ascending: false });
-            document.getElementById('list').innerHTML = data && data.length ? data.map(p => `<div class="post"><b>@${p.sender}</b><p>${p.content}</p></div>`).join('') : "广场空空如也...";
+            if (!api) return;
+            try {
+                const { data, error } = await api.from('capsules').select('*').eq('is_public', true).order('created_at', { ascending: false });
+                if (error) throw error;
+                document.getElementById('list').innerHTML = data && data.length 
+                    ? data.map(p => `<div class="post"><b>@${p.sender}</b><p>${p.content}</p></div>`).join('') 
+                    : "广场空空如也，快来发布第一条吧。";
+            } catch (e) {
+                document.getElementById('list').innerHTML = "数据同步失败，请检查网络并重试。";
+            }
         }
+
         function send() {
-            if (!document.getElementById('c').value) return alert("空内容");
-            if (!api) return alert("连接中...");
-            if (document.getElementById('mode').value == '1') document.getElementById('modal').style.display = 'flex';
-            else commit();
+            if (!document.getElementById('c').value) return alert("写点内容再发布吧");
+            if (!api) return alert("正在连接数据库，请稍等几秒再点");
+            
+            if (document.getElementById('mode').value == '1') {
+                document.getElementById('modal').style.display = 'flex';
+            } else {
+                commit();
+            }
         }
+
         async function commit() {
-            const { error } = await api.from('capsules').insert([{
-                sender: document.getElementById('u').value || "匿名",
-                content: document.getElementById('c').value,
-                is_public: document.getElementById('mode').value == '0',
-                release_time: document.getElementById('d').value || null
-            }]);
-            if (!error) { alert("成功"); location.reload(); } else { alert("失败"); }
+            try {
+                const { error } = await api.from('capsules').insert([{
+                    sender: document.getElementById('u').value || "匿名",
+                    content: document.getElementById('c').value,
+                    is_public: document.getElementById('mode').value == '0',
+                    release_time: document.getElementById('d').value || null
+                }]);
+                if (error) throw error;
+                alert("投递成功！");
+                location.reload();
+            } catch (e) {
+                alert("发布失败，可能是网络问题：" + e.message);
+            }
         }
+
         window.onload = init;
     </script>
 </body>
