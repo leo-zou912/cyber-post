@@ -7,110 +7,107 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --neon-blue: #00f3ff; --dark-bg: #0d0d0f; --glass: rgba(255, 255, 255, 0.05); }
-        body { background: var(--dark-bg); color: #e0e0e0; font-family: -apple-system, sans-serif; margin: 0; padding: 15px; }
+        body { background: var(--dark-bg); color: #e0e0e0; font-family: -apple-system, sans-serif; margin: 0; padding: 15px; line-height: 1.5; }
         .card { background: var(--glass); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 20px; margin-bottom: 15px; }
-        h2 { color: var(--neon-blue); font-size: 1.1rem; margin-top: 0; border-left: 3px solid var(--neon-blue); padding-left: 10px; }
-        input, textarea, select { width: 100%; padding: 12px; margin: 8px 0; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: #fff; box-sizing: border-box; }
-        .tab-group { display: flex; gap: 10px; margin-bottom: 15px; }
-        .tab { flex: 1; padding: 10px; text-align: center; border-radius: 8px; background: rgba(255,255,255,0.05); cursor: pointer; }
-        .tab.active { background: var(--neon-blue); color: #000; font-weight: bold; }
-        .btn-main { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; background: linear-gradient(90deg, #00f3ff, #0077ff); color: white; }
-        .post-item { border-bottom: 1px solid rgba(255,255,255,0.05); padding: 12px 0; }
-        #modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 999; justify-content: center; align-items: center; flex-direction: column; padding: 20px; }
+        h2 { color: var(--neon-blue); font-size: 1.1rem; margin: 0 0 15px 0; border-left: 3px solid var(--neon-blue); padding-left: 10px; }
+        input, textarea, select { width: 100%; padding: 12px; margin: 8px 0; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: #fff; box-sizing: border-box; font-size: 16px; }
+        .btn-main { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; background: linear-gradient(90deg, #00f3ff, #0077ff); color: white; cursor: pointer; transition: 0.3s; }
+        .btn-main:active { opacity: 0.8; transform: scale(0.98); }
+        .post-item { border-bottom: 1px solid rgba(255,255,255,0.05); padding: 15px 0; }
+        .post-item b { color: var(--neon-blue); display: block; margin-bottom: 5px; }
+        #postsList { min-height: 50px; }
     </style>
 </head>
 <body>
 
-    <div class="card" id="square">
+    <div class="card">
         <h2>公共广场</h2>
         <div id="postsList">正在接入数据链路...</div>
     </div>
 
     <div class="card">
         <h2>新投递任务</h2>
-        <div class="tab-group">
-            <div class="tab active" id="tab-public" onclick="setMode('public')">免费公开</div>
-            <div class="tab" id="tab-private" onclick="setMode('private')">私密封存</div>
-        </div>
-        <input type="text" id="sender" placeholder="你的称呼">
+        <input type="text" id="sender" placeholder="你的称呼 (选填)">
         <select id="category">
             <option value="story">📖 故事/文字</option>
             <option value="music">🎵 音乐/链接</option>
             <option value="secret">🤫 秘密/心情</option>
         </select>
-        <textarea id="content" rows="4" placeholder="写下你想说的话..."></textarea>
-        <div id="privateOptions" style="display:none;">
-            <input type="date" id="releaseDate">
-            <p style="text-align:center; color:var(--neon-blue);">￥ 1.88</p>
-        </div>
-        <button class="btn-main" onclick="handleAction()">立即发布</button>
-    </div>
-
-    <div id="modal">
-        <div style="text-align:center; background: #1a1a1c; padding: 30px; border-radius: 20px; border: 1px solid var(--neon-blue);">
-            <p>扫码完成支付以封存</p>
-            <img src="wx_pay.jpg" style="width:200px; margin: 20px 0;">
-            <button class="btn-main" onclick="finalSubmit()">我已支付</button>
-            <p style="margin-top:10px;" onclick="document.getElementById('modal').style.display='none'">取消</p>
-        </div>
+        <textarea id="content" rows="4" placeholder="在这里写下你想说的话..."></textarea>
+        <button class="btn-main" id="submitBtn" onclick="handleAction()">立即发布</button>
     </div>
 
     <script>
-        // --- 核心配置 (请确保 Supabase 首字母大写) ---
+        // --- 核心配置 ---
         const SB_URL = "https://ycurewcdwnsbncafqbaj.supabase.co";
         const SB_KEY = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg";
-        const supabase = Supabase.createClient(SB_URL, SB_KEY);
+        
+        // 确保 Supabase 首字母大写，变量名用 sbClient 避免冲突
+        const sbClient = Supabase.createClient(SB_URL, SB_KEY);
 
-        let currentMode = 'public';
+        // 获取广场数据
+        async function fetchPosts() {
+            try {
+                const { data, error } = await sbClient
+                    .from('capsules')
+                    .select('*')
+                    .eq('is_public', true)
+                    .order('created_at', { ascending: false });
 
-        function setMode(mode) {
-            currentMode = mode;
-            document.getElementById('tab-public').classList.toggle('active', mode === 'public');
-            document.getElementById('tab-private').classList.toggle('active', mode === 'private');
-            document.getElementById('privateOptions').style.display = mode === 'private' ? 'block' : 'none';
-        }
+                const listDiv = document.getElementById('postsList');
+                if (error) throw error;
 
-        async function searchPosts() {
-            const { data, error } = await supabase.from('capsules').select('*').eq('is_public', true).order('created_at', { ascending: false });
-            const list = document.getElementById('postsList');
-            if (data && data.length > 0) {
-                list.innerHTML = data.map(p => `
-                    <div class="post-item">
-                        <b style="color:var(--neon-blue)">@${p.sender}</b>
-                        <p>${p.content}</p>
-                    </div>
-                `).join('');
-            } else {
-                list.innerHTML = "广场空空如也，等待第一份投递...";
+                if (data && data.length > 0) {
+                    listDiv.innerHTML = data.map(p => `
+                        <div class="post-item">
+                            <b>@${p.sender || '匿名人士'}</b>
+                            <div>${p.content}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    listDiv.innerHTML = "广场空空如也，等待第一份投递...";
+                }
+            } catch (err) {
+                console.error(err);
+                document.getElementById('postsList').innerHTML = "数据接入失败，请确认 VPN 已关闭并刷新。";
             }
         }
 
-        function handleAction() {
-            if (!document.getElementById('content').value) return alert("写点什么吧");
-            if (currentMode === 'private') {
-                document.getElementById('modal').style.display = 'flex';
-            } else {
-                finalSubmit();
-            }
-        }
+        // 处理发布动作
+        async function handleAction() {
+            const content = document.getElementById('content').value;
+            const sender = document.getElementById('sender').value;
+            const category = document.getElementById('category').value;
+            const btn = document.getElementById('submitBtn');
 
-        async function finalSubmit() {
-            const { error } = await supabase.from('capsules').insert([{
-                sender: document.getElementById('sender').value || "匿名",
-                content: document.getElementById('content').value,
-                category: document.getElementById('category').value,
-                is_public: (currentMode === 'public'),
-                release_time: document.getElementById('releaseDate').value || null
-            }]);
-            if (!error) {
+            if (!content) return alert("内容不能为空");
+
+            btn.disabled = true;
+            btn.innerText = "正在穿越时空...";
+
+            try {
+                const { error } = await sbClient.from('capsules').insert([{
+                    sender: sender || "匿名",
+                    content: content,
+                    category: category,
+                    is_public: true
+                }]);
+
+                if (error) throw error;
+
                 alert("投递成功！");
-                location.reload();
-            } else {
-                alert("发布失败，请检查网络");
+                document.getElementById('content').value = "";
+                fetchPosts(); // 刷新列表
+            } catch (err) {
+                alert("投递失败: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "立即发布";
             }
         }
 
-        searchPosts();
+        // 页面加载后立即初始化
+        window.onload = fetchPosts;
     </script>
 </body>
 </html>
