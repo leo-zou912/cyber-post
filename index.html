@@ -37,44 +37,45 @@
         <button class="btn-main" id="submitBtn" onclick="handleAction()">立即发布</button>
     </div>
     
-    <script>
-    // 使用 var 确保变量在整个脚本范围内都可用，防止“初始化前访问”错误
+   <script>
+    // 1. 声明变量
+    var sbClient;
     var SB_URL = "https://ycurewcdwnsbncafqbaj.supabase.co";
     var SB_KEY = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg";
-    var sbClient = Supabase.createClient(SB_URL, SB_KEY);
 
-    // 获取数据函数
-    async function fetchPosts() {
-        try {
-            const { data, error } = await sbClient
-                .from('capsules')
-                .select('*')
-                .eq('is_public', true)
-                .order('created_at', { ascending: false });
-
-            const listDiv = document.getElementById('postsList');
-            if (error) throw error;
-
-            if (data && data.length > 0) {
-                listDiv.innerHTML = data.map(p => `
-                    <div class="post-item">
-                        <b>@${p.sender || '匿名人士'}</b>
-                        <div>${p.content}</div>
-                    </div>
-                `).join('');
-            } else {
-                listDiv.innerHTML = "广场空空如也，等待第一份投递...";
-            }
-        } catch (err) {
-            console.error(err);
-            document.getElementById('postsList').innerHTML = "数据接入失败，请确认 VPN 已关闭并刷新。";
+    // 2. 核心初始化函数
+    function initSupabase() {
+        // 检查 Supabase 库是否加载成功
+        if (typeof Supabase !== 'undefined') {
+            sbClient = Supabase.createClient(SB_URL, SB_KEY);
+            console.log("连接器初始化成功");
+            fetchPosts(); // 加载广场数据
+        } else {
+            console.log("等待库加载...");
+            setTimeout(initSupabase, 500); // 半秒后重试
         }
     }
 
-    // 发布函数
+    // 3. 获取数据
+    async function fetchPosts() {
+        if (!sbClient) return;
+        try {
+            const { data, error } = await sbClient.from('capsules').select('*').eq('is_public', true).order('created_at', { ascending: false });
+            const listDiv = document.getElementById('postsList');
+            if (error) throw error;
+            listDiv.innerHTML = (data && data.length > 0) 
+                ? data.map(p => `<div class="post-item"><b>@${p.sender || '匿名'}</b><div>${p.content}</div></div>`).join('')
+                : "广场空空如也，等待第一份投递...";
+        } catch (err) {
+            document.getElementById('postsList').innerHTML = "数据同步中，请稍候...";
+        }
+    }
+
+    // 4. 发布函数
     async function handleAction() {
         const content = document.getElementById('content').value;
         if (!content) return alert("内容不能为空");
+        if (!sbClient) return alert("连接尚未就绪，请稍等几秒");
 
         try {
             const { error } = await sbClient.from('capsules').insert([{
@@ -83,17 +84,16 @@
                 category: document.getElementById('category').value,
                 is_public: true
             }]);
-
             if (error) throw error;
             alert("投递成功！");
             location.reload();
         } catch (err) {
-            alert("发布失败: " + err.message);
+            alert("发送失败，请确认网络顺畅后再试");
         }
     }
 
-    // 确保页面完全加载后再执行
-    window.addEventListener('load', fetchPosts);
+    // 启动
+    window.onload = initSupabase;
 </script>
 </body>
 </html>
