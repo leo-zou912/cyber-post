@@ -71,7 +71,7 @@
     <script>
         // --- 配置区域 ---
         const SB_URL = "https://ycurewcdwnsbncafqbaj.supabase.co";
-        const SB_KEY = "你的_ANON_KEY_填在这里"; // 粘贴你那串 sb_publishable 开头的密钥
+        const SB_KEY = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg"; 
         const supabase = supabase.createClient(SB_URL, SB_KEY);
 
         let currentMode = 'public';
@@ -105,7 +105,10 @@
                 list.innerHTML = "<p style='font-size:0.8rem; color:#666;'>广场空空如也，等待第一份投递...</p>";
             }
         }
-
+<script>
+const SB_URL = "https://ycurewcdwnsbncafqbaj.supabase.co";
+    const SB_KEY = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg"; 
+    const supabase = supabase.createClient(SB_URL, SB_KEY);
         function handleAction() {
             if(!document.getElementById('content').value) return alert("内容不能为空");
             if(currentMode === 'private') {
@@ -139,13 +142,5 @@
 
         searchPosts();
  </script>
-
- <script>
-    // --- 数据库连接配置 ---
-    const SB_URL = "https://ycurewcdwnsbncafqbaj.supabase.co";
-    const SB_KEY = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg"; 
-    const supabase = supabase.createClient(SB_URL, SB_KEY);
-</script>
-                                  
 </body>
 </html>
