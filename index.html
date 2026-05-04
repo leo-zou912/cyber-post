@@ -1,86 +1,33 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>赛博邮报 | 数字化生存档案</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        :root { --neon-blue: #00f3ff; --dark-bg: #0d0d0f; --glass: rgba(255, 255, 255, 0.05); }
-        body { background: var(--dark-bg); color: #e0e0e0; font-family: -apple-system, sans-serif; margin: 0; padding: 15px; }
-        .card { background: var(--glass); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 20px; margin-bottom: 15px; }
-        h2 { color: var(--neon-blue); font-size: 1.1rem; margin: 0 0 15px 0; border-left: 3px solid var(--neon-blue); padding-left: 10px; }
-        input, textarea, select { width: 100%; padding: 12px; margin: 8px 0; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: #fff; box-sizing: border-box; font-size: 16px; }
-        .tab-group { display: flex; gap: 10px; margin-bottom: 15px; }
-        .tab { flex: 1; padding: 10px; text-align: center; border-radius: 8px; background: rgba(255,255,255,0.05); cursor: pointer; }
-        .tab.active { background: var(--neon-blue); color: #000; font-weight: bold; }
-        .btn-main { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; background: linear-gradient(90deg, #00f3ff, #0077ff); color: white; cursor: pointer; }
-        .post-item { border-bottom: 1px solid rgba(255,255,255,0.05); padding: 12px 0; }
-        #modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 999; justify-content: center; align-items: center; flex-direction: column; padding: 20px; }
-    </style>
-</head>
-<body>
+<script>
+    var sbClient;
+    var currentMode = 'public';
+    var SB_URL = "https://ycurewcdwnsbncafqbaj.supabase.co";
+    var SB_KEY = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg";
 
-    <div class="card">
-        <h2>公共广场</h2>
-        <div id="postsList">正在接入数据链路...</div>
-    </div>
-
-    <div class="card">
-        <h2>新投递任务</h2>
-        <div class="tab-group">
-            <div id="tab-public" class="tab active" onclick="setMode('public')">免费公开</div>
-            <div id="tab-private" class="tab" onclick="setMode('private')">私密封存</div>
-        </div>
-        <input type="text" id="sender" placeholder="你的称呼">
-        <select id="category">
-            <option value="story">📖 故事/文字</option>
-            <option value="music">🎵 音乐/链接</option>
-            <option value="secret">🤫 秘密/心情</option>
-        </select>
-        <textarea id="content" rows="4" placeholder="写下你想说的话..."></textarea>
-        
-        <div id="privateOptions" style="display:none;">
-            <p style="color:var(--neon-blue); text-align:center;">封存费用：￥ 1.88</p>
-            <input type="date" id="releaseDate" placeholder="解锁日期">
-        </div>
-        
-        <button class="btn-main" onclick="handleAction()">立即发布</button>
-    </div>
-
-    <div id="modal">
-        <div style="text-align:center; background: #1a1a1c; padding: 30px; border-radius: 20px; border: 1px solid var(--neon-blue); max-width: 80%;">
-            <p>扫码支付以开启私密封存</p>
-            <img src="wx_pay.jpg" style="width:200px; margin: 20px 0; border-radius: 10px;">
-            <button class="btn-main" onclick="finalSubmit()">我已支付</button>
-            <p style="margin-top:15px; font-size: 14px; opacity: 0.6;" onclick="document.getElementById('modal').style.display='none'">返回修改</p>
-        </div>
-    </div>
-
-    <script>
-        var sbClient;
-        var currentMode = 'public';
-        var SB_URL = "https://ycurewcdwnsbncafqbaj.supabase.co";
-        var SB_KEY = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg";
-
-        function setMode(mode) {
-            currentMode = mode;
-            document.getElementById('tab-public').className = (mode === 'public' ? 'tab active' : 'tab');
-            document.getElementById('tab-private').className = (mode === 'private' ? 'tab active' : 'tab');
-            document.getElementById('privateOptions').style.display = (mode === 'private' ? 'block' : 'none');
+    // 1. 初始化连接（带自动重试）
+    function initSupabase() {
+        if (typeof Supabase !== 'undefined') {
+            sbClient = Supabase.createClient(SB_URL, SB_KEY);
+            console.log("Supabase 已连接");
+            fetchPosts();
+        } else {
+            console.log("正在尝试通过备用链路加载...");
+            setTimeout(initSupabase, 500);
         }
+    }
 
-        function initSupabase() {
-            if (typeof Supabase !== 'undefined') {
-                sbClient = Supabase.createClient(SB_URL, SB_KEY);
-                fetchPosts();
-            } else {
-                setTimeout(initSupabase, 500);
-            }
-        }
+    // 2. 模式切换
+    function setMode(mode) {
+        currentMode = mode;
+        document.getElementById('tab-public').className = (mode === 'public' ? 'tab active' : 'tab');
+        document.getElementById('tab-private').className = (mode === 'private' ? 'tab active' : 'tab');
+        document.getElementById('privateOptions').style.display = (mode === 'private' ? 'block' : 'none');
+    }
 
-        async function fetchPosts() {
-            if (!sbClient) return;
+    // 3. 获取数据
+    async function fetchPosts() {
+        if (!sbClient) return;
+        try {
             const { data } = await sbClient.from('capsules').select('*').eq('is_public', true).order('created_at', { ascending: false });
             const list = document.getElementById('postsList');
             if (data && data.length > 0) {
@@ -88,35 +35,40 @@
             } else {
                 list.innerHTML = "广场空空如也，等待第一份投递...";
             }
+        } catch (e) {
+            document.getElementById('postsList').innerHTML = "数据链路同步中...";
         }
+    }
 
-        function handleAction() {
-            if (!document.getElementById('content').value) return alert("内容不能为空");
-            if (currentMode === 'private') {
-                document.getElementById('modal').style.display = 'flex';
-            } else {
-                finalSubmit();
-            }
+    // 4. 处理发布动作
+    function handleAction() {
+        if (!document.getElementById('content').value) return alert("内容不能为空");
+        if (!sbClient) return alert("连接尚未就绪，请稍等几秒...");
+        
+        if (currentMode === 'private') {
+            document.getElementById('modal').style.display = 'flex';
+        } else {
+            finalSubmit();
         }
+    }
 
-        async function finalSubmit() {
-            if (!sbClient) return alert("系统连接中，请稍后");
-            const { error } = await sbClient.from('capsules').insert([{
-                sender: document.getElementById('sender').value || "匿名",
-                content: document.getElementById('content').value,
-                category: document.getElementById('category').value,
-                is_public: (currentMode === 'public'),
-                release_time: document.getElementById('releaseDate').value || null
-            }]);
-            if (!error) {
-                alert("投递成功！");
-                location.reload();
-            } else {
-                alert("发送失败，请重试");
-            }
+    // 5. 最终提交
+    async function finalSubmit() {
+        const { error } = await sbClient.from('capsules').insert([{
+            sender: document.getElementById('sender').value || "匿名",
+            content: document.getElementById('content').value,
+            category: document.getElementById('category').value,
+            is_public: (currentMode === 'public'),
+            release_time: document.getElementById('releaseDate').value || null
+        }]);
+        
+        if (!error) {
+            alert("投递成功！");
+            location.reload();
+        } else {
+            alert("发送失败: " + error.message);
         }
+    }
 
-        window.onload = initSupabase;
-    </script>
-</body>
-</html>
+    window.onload = initSupabase;
+</script>
