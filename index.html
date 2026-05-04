@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>赛博邮报 | 数字化生存档案</title>
-    <!-- 引入外部库 -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --neon-blue: #00f3ff; --dark-bg: #0d0d0f; --glass: rgba(255, 255, 255, 0.05); }
@@ -21,7 +20,6 @@
         .tag { font-size: 0.65rem; background: rgba(0, 243, 255, 0.1); color: var(--neon-blue); padding: 2px 6px; border-radius: 4px; margin-right: 5px; }
         .price-notice { text-align: center; font-size: 1.2rem; color: var(--neon-blue); margin: 15px 0; font-family: monospace; text-shadow: 0 0 8px var(--neon-blue); }
         .btn-main { width: 100%; padding: 15px; border-radius: 12px; border: none; font-weight: bold; background: linear-gradient(90deg, #00f3ff, #0077ff); cursor: pointer; transition: 0.3s; }
-        .btn-main:active { transform: scale(0.98); opacity: 0.8; }
         #modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 999; justify-content: center; align-items: center; flex-direction: column; padding: 20px; backdrop-filter: blur(10px); }
     </style>
 </head>
@@ -42,7 +40,6 @@
             <div class="tab active" id="tab-public" onclick="setMode('public')">免费公开</div>
             <div class="tab" id="tab-private" onclick="setMode('private')">私密封存</div>
         </div>
-        
         <input type="text" id="sender" placeholder="你的称呼 (或 IP 匿名)">
         <select id="category">
             <option value="story">📖 故事/文字</option>
@@ -50,43 +47,36 @@
             <option value="secret">🤫 秘密/心情</option>
         </select>
         <textarea id="content" rows="4" placeholder="在这里写下你的内容..."></textarea>
-        
         <div id="privateOptions" style="display:none;">
-            <label style="font-size: 0.75rem; color: #aaa;">设定解封日期 (可选)：</label>
             <input type="date" id="releaseDate">
             <div class="price-notice" id="dynamicPrice">￥ 1.88</div>
         </div>
-
         <button class="btn-main" id="submitBtn" onclick="handleAction()">立即发布</button>
     </div>
 
     <div id="modal">
         <div style="text-align:center; background: #1a1a1c; padding: 30px; border-radius: 20px; border: 1px solid var(--neon-blue);">
-            <p style="margin-bottom: 20px;">建立个人加密通道</p>
-            <img id="qrImg" style="width:200px; height:200px; background:#fff; border-radius:10px; padding:10px; margin-bottom: 20px;">
+            <p>扫码建立个人加密通道</p>
+            <img src="wx_pay.jpg" style="width:200px; border-radius:10px; margin: 20px 0;">
             <button class="btn-main" onclick="finalSubmit()">我已支付，确认封存</button>
-            <p style="font-size: 0.8rem; color: #555; margin-top: 15px; cursor:pointer;" onclick="document.getElementById('modal').style.display='none'">取消</p>
+            <p style="font-size: 0.8rem; color: #555; margin-top: 15px;" onclick="document.getElementById('modal').style.display='none'">取消</p>
         </div>
     </div>
 
     <script>
-        // --- 1. 配置区域 (必须在最前面) ---
+        // --- 核心配置 ---
         const SB_URL = "https://ycurewcdwnsbncafqbaj.supabase.co";
-        const SB_KEY = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg"; 
-        // 注意：此处首字母 S 必须大写
+        const SB_KEY = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg";
+        // 关键点：Supabase 首字母必须大写
         const supabase = Supabase.createClient(SB_URL, SB_KEY);
 
         let currentMode = 'public';
-        let randomPrice = (Math.random() * (2.0 - 1.0) + 1.0).toFixed(2);
 
-        // --- 2. 功能函数 ---
         function setMode(mode) {
             currentMode = mode;
             document.getElementById('tab-public').classList.toggle('active', mode === 'public');
             document.getElementById('tab-private').classList.toggle('active', mode === 'private');
             document.getElementById('privateOptions').style.display = mode === 'private' ? 'block' : 'none';
-            document.getElementById('submitBtn').innerText = mode === 'private' ? '建立加密连接' : '立即发布';
-            if(mode === 'private') document.getElementById('dynamicPrice').innerText = "￥ " + randomPrice;
         }
 
         async function searchPosts() {
@@ -94,8 +84,9 @@
             let query = supabase.from('capsules').select('*').eq('is_public', true);
             if(keyword) query = query.ilike('content', `%${keyword}%`);
             
-            const { data, error } = await query.order('created_at', { ascending: false }).limit(10);
+            const { data, error } = await query.order('created_at', { ascending: false }).limit(20);
             const list = document.getElementById('postsList');
+            
             if(data && data.length > 0) {
                 list.innerHTML = data.map(p => `
                     <div class="post-item">
@@ -113,7 +104,6 @@
             if(!document.getElementById('content').value) return alert("内容不能为空");
             if(currentMode === 'private') {
                 document.getElementById('modal').style.display = 'flex';
-                document.getElementById('qrImg').src = 'wx_pay.jpg'; 
             } else {
                 finalSubmit();
             }
@@ -133,14 +123,14 @@
             }]);
 
             if(!error) {
-                alert(`[投递成功]\n${currentMode==='private' ? '唯一凭证码: '+accessKey : '已在广场发布'}`);
+                alert(currentMode==='public' ? "投递成功！" : "封存成功！凭证码：" + accessKey);
                 location.reload();
             } else {
-                alert("投递失败，请检查网络或配置: " + error.message);
+                alert("连接失败: " + error.message);
             }
         }
 
-        // --- 3. 页面加载自动运行 ---
+        // 启动加载数据
         searchPosts();
     </script>
 </body>
