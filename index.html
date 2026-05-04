@@ -1,74 +1,70 @@
-<script>
-    var sbClient;
-    var currentMode = 'public';
-    var SB_URL = "https://ycurewcdwnsbncafqbaj.supabase.co";
-    var SB_KEY = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg";
-
-    // 1. 初始化连接（带自动重试）
-    function initSupabase() {
-        if (typeof Supabase !== 'undefined') {
-            sbClient = Supabase.createClient(SB_URL, SB_KEY);
-            console.log("Supabase 已连接");
-            fetchPosts();
-        } else {
-            console.log("正在尝试通过备用链路加载...");
-            setTimeout(initSupabase, 500);
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>赛博邮报</title>
+    <script src="https://npm.elemecdn.com/@supabase/supabase-js@2"></script>
+    <style>
+        :root { --blue: #00f3ff; --bg: #0d0d0f; }
+        body { background: var(--bg); color: #e0e0e0; font-family: sans-serif; padding: 15px; }
+        .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 15px; padding: 20px; margin-bottom: 15px; }
+        input, textarea, select { width: 100%; padding: 12px; margin: 8px 0; background: #000; border: 1px solid #333; border-radius: 8px; color: #fff; box-sizing: border-box; }
+        .btn { width: 100%; padding: 15px; border-radius: 10px; border: none; background: var(--blue); color: #000; font-weight: bold; }
+        .post { border-bottom: 1px solid #222; padding: 10px 0; }
+        #modal { display: none; position: fixed; inset: 0; background: #000; z-index: 99; flex-direction: column; align-items: center; justify-content: center; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h3>公共广场</h3>
+        <div id="list">正在同步链路...</div>
+    </div>
+    <div class="card">
+        <h3>新投递</h3>
+        <select id="mode" onchange="document.getElementById('p_opt').style.display=(this.value=='1'?'block':'none')">
+            <option value="0">免费公开</option>
+            <option value="1">私密封存 (￥1.88)</option>
+        </select>
+        <input id="u" placeholder="你的称呼">
+        <textarea id="c" rows="4" placeholder="写下内容..."></textarea>
+        <div id="p_opt" style="display:none"><input type="date" id="d"></div>
+        <button class="btn" onclick="send()">立即发布</button>
+    </div>
+    <div id="modal">
+        <p>支付 1.88 元开启封存</p>
+        <img src="wx_pay.jpg" style="width:200px; margin:20px">
+        <button onclick="commit()">我已支付</button>
+        <p onclick="this.parentElement.style.display='none'">返回</p>
+    </div>
+    <script>
+        var api, SB_U = "https://ycurewcdwnsbncafqbaj.supabase.co", SB_K = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg";
+        function init() {
+            if (window.Supabase) {
+                api = Supabase.createClient(SB_U, SB_K);
+                load();
+            } else { setTimeout(init, 500); }
         }
-    }
-
-    // 2. 模式切换
-    function setMode(mode) {
-        currentMode = mode;
-        document.getElementById('tab-public').className = (mode === 'public' ? 'tab active' : 'tab');
-        document.getElementById('tab-private').className = (mode === 'private' ? 'tab active' : 'tab');
-        document.getElementById('privateOptions').style.display = (mode === 'private' ? 'block' : 'none');
-    }
-
-    // 3. 获取数据
-    async function fetchPosts() {
-        if (!sbClient) return;
-        try {
-            const { data } = await sbClient.from('capsules').select('*').eq('is_public', true).order('created_at', { ascending: false });
-            const list = document.getElementById('postsList');
-            if (data && data.length > 0) {
-                list.innerHTML = data.map(p => `<div class="post-item"><b style="color:#00f3ff">@${p.sender}</b><p>${p.content}</p></div>`).join('');
-            } else {
-                list.innerHTML = "广场空空如也，等待第一份投递...";
-            }
-        } catch (e) {
-            document.getElementById('postsList').innerHTML = "数据链路同步中...";
+        async function load() {
+            const { data } = await api.from('capsules').select('*').eq('is_public', true).order('created_at', { ascending: false });
+            document.getElementById('list').innerHTML = data && data.length ? data.map(p => `<div class="post"><b>@${p.sender}</b><p>${p.content}</p></div>`).join('') : "广场空空如也...";
         }
-    }
-
-    // 4. 处理发布动作
-    function handleAction() {
-        if (!document.getElementById('content').value) return alert("内容不能为空");
-        if (!sbClient) return alert("连接尚未就绪，请稍等几秒...");
-        
-        if (currentMode === 'private') {
-            document.getElementById('modal').style.display = 'flex';
-        } else {
-            finalSubmit();
+        function send() {
+            if (!document.getElementById('c').value) return alert("空内容");
+            if (!api) return alert("连接中...");
+            if (document.getElementById('mode').value == '1') document.getElementById('modal').style.display = 'flex';
+            else commit();
         }
-    }
-
-    // 5. 最终提交
-    async function finalSubmit() {
-        const { error } = await sbClient.from('capsules').insert([{
-            sender: document.getElementById('sender').value || "匿名",
-            content: document.getElementById('content').value,
-            category: document.getElementById('category').value,
-            is_public: (currentMode === 'public'),
-            release_time: document.getElementById('releaseDate').value || null
-        }]);
-        
-        if (!error) {
-            alert("投递成功！");
-            location.reload();
-        } else {
-            alert("发送失败: " + error.message);
+        async function commit() {
+            const { error } = await api.from('capsules').insert([{
+                sender: document.getElementById('u').value || "匿名",
+                content: document.getElementById('c').value,
+                is_public: document.getElementById('mode').value == '0',
+                release_time: document.getElementById('d').value || null
+            }]);
+            if (!error) { alert("成功"); location.reload(); } else { alert("失败"); }
         }
-    }
-
-    window.onload = initSupabase;
-</script>
+        window.onload = init;
+    </script>
+</body>
+</html>
