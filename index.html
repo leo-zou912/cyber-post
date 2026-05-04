@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>赛博邮报 | 数字化生存档案</title>
+    <!-- 引入外部库 -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --neon-blue: #00f3ff; --dark-bg: #0d0d0f; --glass: rgba(255, 255, 255, 0.05); }
@@ -64,19 +65,21 @@
             <p style="margin-bottom: 20px;">建立个人加密通道</p>
             <img id="qrImg" style="width:200px; height:200px; background:#fff; border-radius:10px; padding:10px; margin-bottom: 20px;">
             <button class="btn-main" onclick="finalSubmit()">我已支付，确认封存</button>
-            <p style="font-size: 0.8rem; color: #555; margin-top: 15px;" onclick="document.getElementById('modal').style.display='none'">取消</p>
+            <p style="font-size: 0.8rem; color: #555; margin-top: 15px; cursor:pointer;" onclick="document.getElementById('modal').style.display='none'">取消</p>
         </div>
     </div>
 
     <script>
-        // --- 配置区域 ---
+        // --- 1. 配置区域 (必须在最前面) ---
         const SB_URL = "https://ycurewcdwnsbncafqbaj.supabase.co";
         const SB_KEY = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg"; 
-        const supabase = supabase.createClient(SB_URL, SB_KEY);
+        // 注意：此处首字母 S 必须大写
+        const supabase = Supabase.createClient(SB_URL, SB_KEY);
 
         let currentMode = 'public';
         let randomPrice = (Math.random() * (2.0 - 1.0) + 1.0).toFixed(2);
 
+        // --- 2. 功能函数 ---
         function setMode(mode) {
             currentMode = mode;
             document.getElementById('tab-public').classList.toggle('active', mode === 'public');
@@ -105,15 +108,12 @@
                 list.innerHTML = "<p style='font-size:0.8rem; color:#666;'>广场空空如也，等待第一份投递...</p>";
             }
         }
-<script>
-const SB_URL = "https://ycurewcdwnsbncafqbaj.supabase.co";
-    const SB_KEY = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg"; 
-    const supabase = supabase.createClient(SB_URL, SB_KEY);
+
         function handleAction() {
             if(!document.getElementById('content').value) return alert("内容不能为空");
             if(currentMode === 'private') {
                 document.getElementById('modal').style.display = 'flex';
-                document.getElementById('qrImg').src = 'wx_pay.jpg'; // 确保你仓库里有这张图
+                document.getElementById('qrImg').src = 'wx_pay.jpg'; 
             } else {
                 finalSubmit();
             }
@@ -140,7 +140,8 @@ const SB_URL = "https://ycurewcdwnsbncafqbaj.supabase.co";
             }
         }
 
+        // --- 3. 页面加载自动运行 ---
         searchPosts();
- </script>
+    </script>
 </body>
 </html>
