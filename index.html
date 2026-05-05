@@ -10,10 +10,9 @@
         body { background: var(--bg); color: #e0e0e0; font-family: sans-serif; padding: 15px; margin: 0; }
         .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 15px; padding: 20px; margin-bottom: 15px; }
         input, textarea, select { width: 100%; padding: 12px; margin: 8px 0; background: #000; border: 1px solid #333; border-radius: 8px; color: #fff; box-sizing: border-box; font-size: 16px; }
-        .btn { width: 100%; padding: 15px; border-radius: 10px; border: none; background: var(--blue); color: #000; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        .btn:active { opacity: 0.7; }
+        .btn { width: 100%; padding: 15px; border-radius: 10px; border: none; background: var(--blue); color: #000; font-weight: bold; cursor: pointer; }
         .post { border-bottom: 1px solid #222; padding: 15px 0; }
-        .post-meta { display: flex; justify-content: space-between; font-size: 11px; color: #666; margin-bottom: 5px; }
+        .post-meta { display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-bottom: 5px; }
         #modal { display: none; position: fixed; inset: 0; background: #000; z-index: 99; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
     </style>
 </head>
@@ -25,15 +24,14 @@
 
     <div class="card">
         <h3>新投递</h3>
-        <select id="u_mode" onchange="document.getElementById('p_opt').style.display=(this.value=='1'?'block':'none')">
+        <select id="mode" onchange="document.getElementById('p_opt').style.display=(this.value=='1'?'block':'none')">
             <option value="0">免费公开投递</option>
             <option value="1">私密封存 (￥1.88)</option>
         </select>
-        <input id="u_name" placeholder="你的称呼">
-        <input id="u_geo" placeholder="探测定位中...">
-        <textarea id="u_content" rows="4" placeholder="此刻你在想什么？"></textarea>
-        <div id="p_opt" style="display:none"><p>设置解锁日期：</p><input type="date" id="u_date"></div>
-        <button id="sendBtn" class="btn" onclick="send()">立即发布</button>
+        <input id="u" placeholder="你的称呼">
+        <textarea id="c" rows="4" placeholder="此刻你在想什么？"></textarea>
+        <div id="p_opt" style="display:none"><p>设置解锁日期：</p><input type="date" id="d"></div>
+        <button class="btn" onclick="send()">立即发布</button>
     </div>
 
     <div id="modal">
@@ -46,35 +44,15 @@
     </div>
 
     <script>
-        var api;
+        var api, userCity = "未知时空";
         const SB_U = "https://ycurewcdwnsbncafqbaj.supabase.co", SB_K = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg";
 
-        // 高德定位及英文转换逻辑
-        function getGeoInfo() {
-            // 使用高德公开的 IP 定位接口 (需 Key 或直接使用 IP 精简版)
-            // 这里为了最稳妥，使用了通用的 IP 解析并手动汉英映射
-            fetch('https://restapi.amap.com/v3/ip?key=8325164e247e15eea68b59e89200988b').then(res => res.json()).then(data => {
-                if(data.status === "1") {
-                    let p = data.province || "";
-                    let c = data.city || "";
-                    // 简单的汉英转换逻辑
-                    let engGeo = (p + " " + c)
-                        .replace("北京市", "Beijing").replace("上海市", "Shanghai")
-                        .replace("广东省", "Guangdong").replace("广州市", "Guangzhou").replace("深圳市", "Shenzhen")
-                        .replace("四川省", "Sichuan").replace("成都市", "Chengdu")
-                        .replace("湖北省", "Hubei").replace("武汉市", "Wuhan")
-                        .replace("浙江省", "Zhejiang").replace("杭州市", "Hangzhou")
-                        .replace("香港", "Hong Kong").replace("澳门", "Macao");
-                    
-                    document.getElementById('u_geo').value = engGeo || "China";
-                }
-            }).catch(() => {
-                document.getElementById('u_geo').value = "Deep Space";
-            });
-        }
+        // 自动获取地标
+        fetch('https://ipapi.co/json/').then(res => res.json()).then(data => {
+            userCity = data.city ? `${data.country_name} ${data.city}` : "未知时空";
+        }).catch(() => userCity = "星际边缘");
 
         function init() {
-            getGeoInfo();
             if (window.supabase) {
                 api = window.supabase.createClient(SB_U, SB_K);
                 load();
@@ -91,7 +69,7 @@
                     return `<div class="post">
                         <div class="post-meta">
                             <b style="color:var(--blue)">@${p.sender}</b>
-                            <span>${p.category || 'Unknown'} · ${localTime}</span>
+                            <span>${p.category || '未知'} · ${localTime}</span>
                         </div>
                         <p style="margin:0">${p.content}</p>
                     </div>`;
@@ -100,34 +78,24 @@
         }
 
         function send() {
-            if (!document.getElementById('u_content').value) return alert("内容不能为空");
-            if (!api) return alert("正在连接数据库...");
-            if (document.getElementById('u_mode').value == '1') document.getElementById('modal').style.display = 'flex';
+            if (!document.getElementById('c').value) return alert("内容不能为空");
+            if (!api) return alert("连接中...");
+            if (document.getElementById('mode').value == '1') document.getElementById('modal').style.display = 'flex';
             else commit();
         }
 
         async function commit() {
-            const btn = document.getElementById('sendBtn');
-            btn.disabled = true;
-            btn.innerText = "投递中...";
-
             const { error } = await api.from('capsules').insert([{
-                sender: document.getElementById('u_name').value || "匿名",
-                content: document.getElementById('u_content').value,
-                is_public: document.getElementById('u_mode').value == '0',
-                category: document.getElementById('u_geo').value, // 存入翻译后的英文地名
-                release_time: document.getElementById('u_date').value || null
+                sender: document.getElementById('u').value || "匿名",
+                content: document.getElementById('c').value,
+                is_public: document.getElementById('mode').value == '0',
+                category: userCity, // 将地标存入 category 字段
+                release_time: document.getElementById('d').value || null
             }]);
-
-            if (!error) { 
-                alert("投递成功！"); 
-                location.reload(); 
-            } else { 
-                alert("失败：" + error.message);
-                btn.disabled = false;
-                btn.innerText = "立即发布";
-            }
+            if (!error) { alert("投递成功！"); location.reload(); }
+            else { alert("失败：" + error.message); }
         }
+
         window.onload = init;
     </script>
 </body>
