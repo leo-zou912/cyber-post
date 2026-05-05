@@ -24,13 +24,13 @@
 
     <div class="card">
         <h3>新投递</h3>
-        <select id="mode" onchange="document.getElementById('p_opt').style.display=(this.value=='1'?'block':'none')">
+        <select id="u_mode" onchange="document.getElementById('p_opt').style.display=(this.value=='1'?'block':'none')">
             <option value="0">免费公开投递</option>
             <option value="1">私密封存 (￥1.88)</option>
         </select>
-        <input id="u" placeholder="你的称呼">
-        <textarea id="c" rows="4" placeholder="此刻你在想什么？"></textarea>
-        <div id="p_opt" style="display:none"><p>设置解锁日期：</p><input type="date" id="d"></div>
+        <input id="u_name" placeholder="你的称呼">
+        <textarea id="u_content" rows="4" placeholder="此刻你在想什么？"></textarea>
+        <div id="p_opt" style="display:none"><p>设置解锁日期：</p><input type="date" id="u_date"></div>
         <button class="btn" onclick="send()">立即发布</button>
     </div>
 
@@ -44,15 +44,21 @@
     </div>
 
     <script>
-        var api, userCity = "未知时空";
+        var api, userCity = "定位中...";
         const SB_U = "https://ycurewcdwnsbncafqbaj.supabase.co", SB_K = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg";
 
-        // 自动获取地标
-        fetch('https://ipapi.co/json/').then(res => res.json()).then(data => {
-            userCity = data.city ? `${data.country_name} ${data.city}` : "未知时空";
-        }).catch(() => userCity = "星际边缘");
+        // 获取中文地标
+        function getCity() {
+            var script = document.createElement('script');
+            script.src = 'https://pv.sohu.com/cityjson?ie=utf-8';
+            document.body.appendChild(script);
+            script.onload = function() {
+                if(window.returnCitySN) userCity = returnCitySN.cname;
+            };
+        }
 
         function init() {
+            getCity();
             if (window.supabase) {
                 api = window.supabase.createClient(SB_U, SB_K);
                 load();
@@ -69,7 +75,7 @@
                     return `<div class="post">
                         <div class="post-meta">
                             <b style="color:var(--blue)">@${p.sender}</b>
-                            <span>${p.category || '未知'} · ${localTime}</span>
+                            <span>${p.category || '来自远方'} · ${localTime}</span>
                         </div>
                         <p style="margin:0">${p.content}</p>
                     </div>`;
@@ -78,19 +84,19 @@
         }
 
         function send() {
-            if (!document.getElementById('c').value) return alert("内容不能为空");
+            if (!document.getElementById('u_content').value) return alert("内容不能为空");
             if (!api) return alert("连接中...");
-            if (document.getElementById('mode').value == '1') document.getElementById('modal').style.display = 'flex';
+            if (document.getElementById('u_mode').value == '1') document.getElementById('modal').style.display = 'flex';
             else commit();
         }
 
         async function commit() {
             const { error } = await api.from('capsules').insert([{
-                sender: document.getElementById('u').value || "匿名",
-                content: document.getElementById('c').value,
-                is_public: document.getElementById('mode').value == '0',
-                category: userCity, // 将地标存入 category 字段
-                release_time: document.getElementById('d').value || null
+                sender: document.getElementById('u_name').value || "匿名",
+                content: document.getElementById('u_content').value,
+                is_public: document.getElementById('u_mode').value == '0',
+                category: userCity,
+                release_time: document.getElementById('u_date').value || null
             }]);
             if (!error) { alert("投递成功！"); location.reload(); }
             else { alert("失败：" + error.message); }
