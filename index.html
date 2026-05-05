@@ -19,29 +19,29 @@
 </head>
 <body>
     <div class="card">
-        <h3>Public Square</h3>
-        <div id="list">Synchronizing...</div>
+        <h3>公共广场</h3>
+        <div id="list">正在接入数据链路...</div>
     </div>
 
     <div class="card">
-        <h3>New Post</h3>
+        <h3>新投递</h3>
         <select id="u_mode" onchange="document.getElementById('p_opt').style.display=(this.value=='1'?'block':'none')">
-            <option value="0">Public Post (Free)</option>
-            <option value="1">Private Capsule (￥1.88)</option>
+            <option value="0">免费公开投递</option>
+            <option value="1">私密封存 (￥1.88)</option>
         </select>
-        <input id="u_name" placeholder="Your Name">
-        <input id="u_geo" placeholder="Locating...">
-        <textarea id="u_content" rows="4" placeholder="What's on your mind?"></textarea>
-        <div id="p_opt" style="display:none"><p>Unlock Date:</p><input type="date" id="u_date"></div>
-        <button id="sendBtn" class="btn" onclick="send()">Post Now</button>
+        <input id="u_name" placeholder="你的称呼">
+        <input id="u_geo" placeholder="探测定位中...">
+        <textarea id="u_content" rows="4" placeholder="此刻你在想什么？"></textarea>
+        <div id="p_opt" style="display:none"><p>设置解锁日期：</p><input type="date" id="u_date"></div>
+        <button id="sendBtn" class="btn" onclick="send()">立即发布</button>
     </div>
 
     <div id="modal">
         <div style="padding:20px;">
-            <p>Pay ￥1.88 to Seal</p>
+            <p>支付 1.88 元开启封存</p>
             <img src="wx_pay.jpg" style="width:220px; border-radius:10px; margin:20px 0;">
-            <button class="btn" onclick="commit()">I have paid</button>
-            <p style="margin-top:20px; color:#888;" onclick="document.getElementById('modal').style.display='none'">Back</p>
+            <button class="btn" onclick="commit()">我已支付</button>
+            <p style="margin-top:20px; color:#888;" onclick="document.getElementById('modal').style.display='none'">返回修改</p>
         </div>
     </div>
 
@@ -49,11 +49,25 @@
         var api;
         const SB_U = "https://ycurewcdwnsbncafqbaj.supabase.co", SB_K = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg";
 
-        // 英文定位逻辑：直接将结果填入输入框
+        // 高德定位及英文转换逻辑
         function getGeoInfo() {
-            fetch('https://ipapi.co/json/').then(res => res.json()).then(data => {
-                const location = (data.country_name || "") + " " + (data.city || "");
-                document.getElementById('u_geo').value = location.trim() || "Earth";
+            // 使用高德公开的 IP 定位接口 (需 Key 或直接使用 IP 精简版)
+            // 这里为了最稳妥，使用了通用的 IP 解析并手动汉英映射
+            fetch('https://restapi.amap.com/v3/ip?key=8325164e247e15eea68b59e89200988b').then(res => res.json()).then(data => {
+                if(data.status === "1") {
+                    let p = data.province || "";
+                    let c = data.city || "";
+                    // 简单的汉英转换逻辑
+                    let engGeo = (p + " " + c)
+                        .replace("北京市", "Beijing").replace("上海市", "Shanghai")
+                        .replace("广东省", "Guangdong").replace("广州市", "Guangzhou").replace("深圳市", "Shenzhen")
+                        .replace("四川省", "Sichuan").replace("成都市", "Chengdu")
+                        .replace("湖北省", "Hubei").replace("武汉市", "Wuhan")
+                        .replace("浙江省", "Zhejiang").replace("杭州市", "Hangzhou")
+                        .replace("香港", "Hong Kong").replace("澳门", "Macao");
+                    
+                    document.getElementById('u_geo').value = engGeo || "China";
+                }
             }).catch(() => {
                 document.getElementById('u_geo').value = "Deep Space";
             });
@@ -73,29 +87,21 @@
                 const { data, error } = await api.from('capsules').select('*').eq('is_public', true).order('created_at', { ascending: false });
                 if (error) throw error;
                 document.getElementById('list').innerHTML = data && data.length ? data.map(p => {
-                    // 时间依然自动转为北京时间方便你查看，或者随系统时区
                     const localTime = new Date(p.created_at).toLocaleString('zh-CN', {month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hour12:false});
                     return `<div class="post">
                         <div class="post-meta">
                             <b style="color:var(--blue)">@${p.sender}</b>
-                            <span>${p.category || 'Remote'} · ${localTime}</span>
+                            <span>${p.category || 'Unknown'} · ${localTime}</span>
                         </div>
                         <p style="margin:0">${p.content}</p>
                     </div>`;
-                }).join('') : "The square is empty...";
-            } catch (e) { document.getElementById('list').innerHTML = "Sync Failed"; }
+                }).join('') : "广场空空如也...";
+            } catch (e) { document.getElementById('list').innerHTML = "链路同步失败"; }
         }
 
         function send() {
-            if (!document.getElementById('u_content').value) return alert("Content is empty");
-            if (!api) return alert("Connecting...");
-            
-            // 检查：如果定位还没出来，提醒用户
-            if (!document.getElementById('u_geo').value) {
-                alert("Wait a second for GPS locking...");
-                return;
-            }
-
+            if (!document.getElementById('u_content').value) return alert("内容不能为空");
+            if (!api) return alert("正在连接数据库...");
             if (document.getElementById('u_mode').value == '1') document.getElementById('modal').style.display = 'flex';
             else commit();
         }
@@ -103,24 +109,23 @@
         async function commit() {
             const btn = document.getElementById('sendBtn');
             btn.disabled = true;
-            btn.innerText = "Sending...";
+            btn.innerText = "投递中...";
 
             const { error } = await api.from('capsules').insert([{
-                sender: document.getElementById('u_name').value || "Anonymous",
+                sender: document.getElementById('u_name').value || "匿名",
                 content: document.getElementById('u_content').value,
                 is_public: document.getElementById('u_mode').value == '0',
-                // 重要：发布时直接读取输入框里的地名
-                category: document.getElementById('u_geo').value,
+                category: document.getElementById('u_geo').value, // 存入翻译后的英文地名
                 release_time: document.getElementById('u_date').value || null
             }]);
 
             if (!error) { 
-                alert("Post successful!"); 
+                alert("投递成功！"); 
                 location.reload(); 
             } else { 
-                alert("Error: " + error.message);
+                alert("失败：" + error.message);
                 btn.disabled = false;
-                btn.innerText = "Post Now";
+                btn.innerText = "立即发布";
             }
         }
         window.onload = init;
