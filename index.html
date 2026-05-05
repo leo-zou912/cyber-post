@@ -12,14 +12,14 @@
         input, textarea, select { width: 100%; padding: 12px; margin: 8px 0; background: #000; border: 1px solid #333; border-radius: 8px; color: #fff; box-sizing: border-box; font-size: 16px; }
         .btn { width: 100%; padding: 15px; border-radius: 10px; border: none; background: var(--blue); color: #000; font-weight: bold; cursor: pointer; }
         .post { border-bottom: 1px solid #222; padding: 15px 0; }
-        .post-meta { display: flex; justify-content: space-between; font-size: 12px; color: #666; margin-bottom: 5px; }
+        .post-meta { display: flex; justify-content: space-between; font-size: 11px; color: #666; margin-bottom: 5px; }
         #modal { display: none; position: fixed; inset: 0; background: #000; z-index: 99; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
     </style>
 </head>
 <body>
     <div class="card">
         <h3>公共广场</h3>
-        <div id="list">正在接入数据链路...</div>
+        <div id="list">正在同步链路...</div>
     </div>
 
     <div class="card">
@@ -29,7 +29,7 @@
             <option value="1">私密封存 (￥1.88)</option>
         </select>
         <input id="u_name" placeholder="你的称呼">
-        <textarea id="u_content" rows="4" placeholder="此刻你在想什么？"></textarea>
+        <textarea id="u_content" rows="4" placeholder="写下这一刻的内容..."></textarea>
         <div id="p_opt" style="display:none"><p>设置解锁日期：</p><input type="date" id="u_date"></div>
         <button class="btn" onclick="send()">立即发布</button>
     </div>
@@ -47,18 +47,24 @@
         var api, userCity = "定位中...";
         const SB_U = "https://ycurewcdwnsbncafqbaj.supabase.co", SB_K = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg";
 
-        // 获取中文地标
-        function getCity() {
-            var script = document.createElement('script');
-            script.src = 'https://pv.sohu.com/cityjson?ie=utf-8';
-            document.body.appendChild(script);
-            script.onload = function() {
-                if(window.returnCitySN) userCity = returnCitySN.cname;
-            };
+        // 获取地理位置：中国显示中文，外国显示英文
+        function getGeoInfo() {
+            fetch('https://ipapi.co/json/').then(res => res.json()).then(data => {
+                if (data.country_code === 'CN') {
+                    // 如果是中国，尝试用搜狐接口拿精准中文名
+                    var s = document.createElement('script');
+                    s.src = 'https://pv.sohu.com/cityjson?ie=utf-8';
+                    document.body.appendChild(s);
+                    s.onload = function() { userCity = window.returnCitySN ? returnCitySN.cname : "中国 某个角落"; };
+                } else {
+                    // 如果是外国，直接显示英文
+                    userCity = (data.country_name || "") + " " + (data.city || "");
+                }
+            }).catch(() => userCity = "未知时空");
         }
 
         function init() {
-            getCity();
+            getGeoInfo();
             if (window.supabase) {
                 api = window.supabase.createClient(SB_U, SB_K);
                 load();
@@ -101,7 +107,6 @@
             if (!error) { alert("投递成功！"); location.reload(); }
             else { alert("失败：" + error.message); }
         }
-
         window.onload = init;
     </script>
 </body>
