@@ -10,7 +10,8 @@
         body { background: var(--bg); color: #e0e0e0; font-family: sans-serif; padding: 15px; margin: 0; }
         .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 15px; padding: 20px; margin-bottom: 15px; }
         input, textarea, select { width: 100%; padding: 12px; margin: 8px 0; background: #000; border: 1px solid #333; border-radius: 8px; color: #fff; box-sizing: border-box; font-size: 16px; }
-        .btn { width: 100%; padding: 15px; border-radius: 10px; border: none; background: var(--blue); color: #000; font-weight: bold; cursor: pointer; }
+        .btn { width: 100%; padding: 15px; border-radius: 10px; border: none; background: var(--blue); color: #000; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        .btn:active { opacity: 0.7; }
         .post { border-bottom: 1px solid #222; padding: 15px 0; }
         .post-meta { display: flex; justify-content: space-between; font-size: 11px; color: #666; margin-bottom: 5px; }
         #modal { display: none; position: fixed; inset: 0; background: #000; z-index: 99; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
@@ -19,7 +20,7 @@
 <body>
     <div class="card">
         <h3>公共广场</h3>
-        <div id="list">正在同步链路...</div>
+        <div id="list">正在同步时空链路...</div>
     </div>
 
     <div class="card">
@@ -31,7 +32,7 @@
         <input id="u_name" placeholder="你的称呼">
         <textarea id="u_content" rows="4" placeholder="写下这一刻的内容..."></textarea>
         <div id="p_opt" style="display:none"><p>设置解锁日期：</p><input type="date" id="u_date"></div>
-        <button class="btn" onclick="send()">立即发布</button>
+        <button id="sendBtn" class="btn" onclick="send()">立即发布</button>
     </div>
 
     <div id="modal">
@@ -47,20 +48,29 @@
         var api, userCity = "定位中...";
         const SB_U = "https://ycurewcdwnsbncafqbaj.supabase.co", SB_K = "sb_publishable_5S2rpoBoCn1wWVAwDoGJnw_ilwXnPQg";
 
-        // 获取地理位置：中国显示中文，外国显示英文
+        // 核心优化：双引擎定位逻辑
         function getGeoInfo() {
+            // 引擎1：尝试获取国际信息（判断国别）
             fetch('https://ipapi.co/json/').then(res => res.json()).then(data => {
                 if (data.country_code === 'CN') {
-                    // 如果是中国，尝试用搜狐接口拿精准中文名
+                    // 如果是中国，启用引擎2：搜狐中文高精度接口
                     var s = document.createElement('script');
                     s.src = 'https://pv.sohu.com/cityjson?ie=utf-8';
                     document.body.appendChild(s);
-                    s.onload = function() { userCity = window.returnCitySN ? returnCitySN.cname : "中国 某个角落"; };
+                    s.onload = function() { 
+                        userCity = window.returnCitySN ? returnCitySN.cname : "中国 某个角落";
+                    };
                 } else {
-                    // 如果是外国，直接显示英文
+                    // 如果是海外，直接显示英文城市名
                     userCity = (data.country_name || "") + " " + (data.city || "");
                 }
-            }).catch(() => userCity = "未知时空");
+            }).catch(() => {
+                // 如果被拦截，降级使用搜狐接口
+                var s = document.createElement('script');
+                s.src = 'https://pv.sohu.com/cityjson?ie=utf-8';
+                document.body.appendChild(s);
+                s.onload = function() { userCity = window.returnCitySN ? returnCitySN.cname : "未知时空"; };
+            });
         }
 
         function init() {
@@ -92,11 +102,22 @@
         function send() {
             if (!document.getElementById('u_content').value) return alert("内容不能为空");
             if (!api) return alert("连接中...");
+            
+            // 防抖：防止定位未完成就发布
+            if (userCity === "定位中...") {
+                alert("正在锁定你的时空坐标，请再试一次...");
+                return;
+            }
+
             if (document.getElementById('u_mode').value == '1') document.getElementById('modal').style.display = 'flex';
             else commit();
         }
 
         async function commit() {
+            const btn = document.getElementById('sendBtn');
+            btn.disabled = true;
+            btn.innerText = "投递中...";
+
             const { error } = await api.from('capsules').insert([{
                 sender: document.getElementById('u_name').value || "匿名",
                 content: document.getElementById('u_content').value,
@@ -104,8 +125,15 @@
                 category: userCity,
                 release_time: document.getElementById('u_date').value || null
             }]);
-            if (!error) { alert("投递成功！"); location.reload(); }
-            else { alert("失败：" + error.message); }
+
+            if (!error) { 
+                alert("投递成功！已穿越时空。"); 
+                location.reload(); 
+            } else { 
+                alert("发送失败：" + error.message);
+                btn.disabled = false;
+                btn.innerText = "立即发布";
+            }
         }
         window.onload = init;
     </script>
